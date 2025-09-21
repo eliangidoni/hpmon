@@ -1,0 +1,24 @@
+services:
+  hpmon-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: hpmon-dev
+    volumes:
+      - .:/workspace:cached
+      - /lib/modules:/lib/modules:ro
+      - /usr/src:/usr/src:ro
+      - /boot:/boot:ro
+      - /sys:/sys:rw
+      - /sys/kernel/debug:/sys/kernel/debug:rw
+    privileged: true
+    pid: host
+    network_mode: host
+    cap_add:
+      - ALL
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
+    stdin_open: true
+    tty: true
+    working_dir: /workspace

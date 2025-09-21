@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      TERM: xterm-256color
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache build dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/apt
+          /var/cache/apt
+        key: ${{ runner.os }}-apt-${{ hashFiles('**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libbpf-dev \
+          clang \
+          clang-format \
+          clang-tidy \
+          llvm \
+          libelf-dev \
+          zlib1g-dev \
+          linux-headers-generic \
+          pkg-config
+
+    - name: Check dependencies
+      run: make check-deps
+
+    - name: Build project
+      run: make all
+
+    - name: Run checks (format, lint, test)
+      run: sudo make check
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: hpmon-binary
+        path: hpmon
+        retention-days: 7
+
+    - name: Clean up
+      run: sudo make clean
