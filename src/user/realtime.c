@@ -41,7 +41,6 @@
 static struct realtime_processor g_processor = {0};
 
 /* Helper function declarations */
-static uint64_t get_current_time_ns(void);
 static uint64_t get_current_time_us(void);
 static bool should_rate_limit(size_t data_size);
 static struct rt_process_metrics *find_or_create_process_metrics(uint32_t pid, const char *comm);
@@ -50,25 +49,6 @@ static int update_process_metrics(struct rt_process_metrics *metrics,
 static double calculate_rate(uint64_t current_value, uint64_t previous_value,
                              uint64_t time_delta_ns);
 static void cleanup_inactive_processes(void);
-
-/* Get current time in nanoseconds */
-static uint64_t get_current_time_ns(void)
-{
-    struct timespec timestamp;
-    if (clock_gettime(CLOCK_MONOTONIC, &timestamp) != 0) {
-        return 0;
-    }
-
-    /* Ensure we don't overflow by checking bounds */
-    uint64_t sec_ns = (uint64_t)timestamp.tv_sec * NANOSECONDS_PER_SECOND;
-
-    /* Check for overflow in the multiplication */
-    if (timestamp.tv_sec > 0 && sec_ns / NANOSECONDS_PER_SECOND != (uint64_t)timestamp.tv_sec) {
-        return 0; /* Overflow detected */
-    }
-
-    return sec_ns + (uint64_t)timestamp.tv_nsec;
-}
 
 /* Get current time in microseconds */
 static uint64_t get_current_time_us(void)

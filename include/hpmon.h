@@ -25,7 +25,7 @@
 #define IO_MAP_SIZE 4096
 
 /* Data collection intervals (milliseconds) */
-#define DEFAULT_POLL_INTERVAL 100
+#define DEFAULT_POLL_INTERVAL 1000
 #define DEFAULT_AGGREGATION_WINDOW 1000
 
 /* Real-time processing defaults */
@@ -33,7 +33,7 @@
 #define DEFAULT_RATE_LIMIT_MB 10
 
 /* Configuration limits */
-#define MIN_POLL_INTERVAL 10
+#define MIN_POLL_INTERVAL 100
 #define MAX_POLL_INTERVAL 10000
 #define MIN_AGGREGATION_WINDOW 100
 #define MAX_AGGREGATION_WINDOW 60000

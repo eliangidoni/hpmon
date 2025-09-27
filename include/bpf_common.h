@@ -122,7 +122,6 @@ struct cpu_stats {
     __u64 timestamp;
     __u32 pid;
     __u32 tgid;
-    __u32 cpu_percent;
     __u8 exited; /* Mark if process has exited for cleanup */
 };
 

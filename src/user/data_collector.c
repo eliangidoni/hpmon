@@ -46,7 +46,6 @@
 static struct data_collector g_collector = {0};
 
 /* Helper functions */
-static uint64_t get_current_time_ns(void);
 static int collect_cpu_data(void);
 static int collect_syscall_data(void);
 static int collect_io_data(void);
@@ -342,12 +341,23 @@ int data_collector_cleanup_old_processes(uint32_t max_age_ms)
     return removed;
 }
 
-/* Helper function to get current time in nanoseconds */
-static uint64_t get_current_time_ns(void)
+/* Get current time in nanoseconds */
+uint64_t get_current_time_ns(void)
 {
-    struct timespec time_spec;
-    clock_gettime(CLOCK_MONOTONIC, &time_spec);
-    return (uint64_t)time_spec.tv_sec * NANOSECONDS_PER_SECOND + (uint64_t)time_spec.tv_nsec;
+    struct timespec timestamp;
+    if (clock_gettime(CLOCK_MONOTONIC, &timestamp) != 0) {
+        return 0;
+    }
+
+    /* Ensure we don't overflow by checking bounds */
+    uint64_t sec_ns = (uint64_t)timestamp.tv_sec * NANOSECONDS_PER_SECOND;
+
+    /* Check for overflow in the multiplication */
+    if (timestamp.tv_sec > 0 && sec_ns / NANOSECONDS_PER_SECOND != (uint64_t)timestamp.tv_sec) {
+        return 0; /* Overflow detected */
+    }
+
+    return sec_ns + (uint64_t)timestamp.tv_nsec;
 }
 
 /* Collect CPU data from eBPF maps */

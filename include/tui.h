@@ -17,7 +17,6 @@
 #include <stdint.h>
 
 /* TUI configuration constants */
-#define TUI_REFRESH_RATE_MS 500      /* TUI refresh rate */
 #define TUI_MAX_VISIBLE_PROCESSES 50 /* Maximum processes shown at once */
 #define TUI_MIN_WIDTH 80             /* Minimum terminal width */
 #define TUI_MIN_HEIGHT 24            /* Minimum terminal height */
@@ -58,7 +57,7 @@ int tui_update_data(const struct rt_process_metrics *process_metrics, size_t cou
  * Handle keyboard input and refresh display
  * @returns true to continue, false to exit
  */
-bool tui_handle_input_and_refresh();
+bool tui_handle_input_and_refresh(unsigned int poll_interval_ms);
 
 /**
  * Cleanup and shutdown TUI

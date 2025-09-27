@@ -113,7 +113,7 @@ static int tui_compare_processes(const void *first_proc, const void *second_proc
 static const char *tui_format_trend(double trend);
 static void tui_handle_resize(void);
 static uint64_t tui_get_current_time_ms(void);
-static bool tui_should_refresh(void);
+static bool tui_should_refresh(unsigned int poll_interval_ms);
 static double tui_convert_bytes_to_mb(double bytes_per_sec);
 static double tui_convert_calls_to_microsec(double calls_per_sec);
 static double tui_get_current_cpu_percent(const struct rt_process_metrics *proc);
@@ -231,7 +231,7 @@ int tui_update_data(const struct rt_process_metrics *process_metrics, size_t cou
     return 0;
 }
 
-bool tui_handle_input_and_refresh()
+bool tui_handle_input_and_refresh(unsigned int poll_interval_ms)
 {
     if (!tui.initialized) {
         return false;
@@ -339,7 +339,7 @@ bool tui_handle_input_and_refresh()
 
     /* Check if we should refresh based on time interval */
     if (!need_refresh) {
-        need_refresh = tui_should_refresh();
+        need_refresh = tui_should_refresh(poll_interval_ms);
     }
 
     /* Only refresh display if needed */
@@ -924,10 +924,10 @@ static uint64_t tui_get_current_time_ms(void)
     return (uint64_t)timespec_val.tv_sec * ms_per_sec + (uint64_t)timespec_val.tv_nsec / ns_per_ms;
 }
 
-static bool tui_should_refresh(void)
+static bool tui_should_refresh(unsigned int poll_interval_ms)
 {
     uint64_t current_time = tui_get_current_time_ms();
-    if (current_time - tui.last_refresh_time >= TUI_REFRESH_RATE_MS) {
+    if (current_time - tui.last_refresh_time >= poll_interval_ms) {
         tui.last_refresh_time = current_time;
         return true;
     }

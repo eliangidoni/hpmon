@@ -31,6 +31,14 @@ struct {
     __type(value, struct cpu_start_request);
 } process_start_times SEC(".maps");
 
+/* Map to track process mode sys/user */
+struct {
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
+    __uint(max_entries, 8192);
+    __type(key, __u32);  /* PID */
+    __type(value, __u8); /* flag */
+} in_sys_mode SEC(".maps");
+
 /* Ring buffer for CPU events */
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -92,7 +100,8 @@ static __always_inline int should_sample_cpu(__u32 pid, __u32 tgid)
 }
 
 /* Helper function to update CPU statistics */
-static __always_inline void update_cpu_stats(__u32 pid, __u32 tgid, __u64 delta_ns)
+static __always_inline void update_cpu_stats(__u32 pid, __u32 tgid, __u64 delta_ns,
+                                             __u8 in_sys_delta)
 {
     struct cpu_key key = {
         .pid = pid,
@@ -102,6 +111,11 @@ static __always_inline void update_cpu_stats(__u32 pid, __u32 tgid, __u64 delta_
     if (stats) {
         /* Update existing stats */
         stats->cpu_time_ns += delta_ns;
+        if (in_sys_delta) {
+            stats->sys_time_ns += delta_ns;
+        } else {
+            stats->user_time_ns += delta_ns;
+        }
         stats->timestamp = get_timestamp_ns();
         /* Note: CPU percentage calculation will be done in user space */
     } else {
@@ -110,9 +124,8 @@ static __always_inline void update_cpu_stats(__u32 pid, __u32 tgid, __u64 delta_
             .pid = pid,
             .tgid = tgid,
             .cpu_time_ns = delta_ns,
-            .user_time_ns = 0, /* Will be updated by other tracepoints */
-            .sys_time_ns = 0,  /* Will be updated by other tracepoints */
-            .cpu_percent = 0,  /* Calculated in user space */
+            .user_time_ns = in_sys_delta ? 0 : delta_ns,
+            .sys_time_ns = in_sys_delta ? delta_ns : 0,
             .timestamp = get_timestamp_ns(),
             .exited = 0,
         };
@@ -121,6 +134,40 @@ static __always_inline void update_cpu_stats(__u32 pid, __u32 tgid, __u64 delta_
             increment_error_counter(ERROR_MAP_UPDATE_FAILED);
         }
     }
+}
+
+/* Tracepoint for system call entry */
+SEC("tracepoint/raw_syscalls/sys_enter")
+int trace_sys_enter(struct trace_event_raw_sys_enter *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 tgid = pid_tgid >> 32;
+    __u32 pid = (__u32)pid_tgid;
+
+    /* Filter out kernel threads */
+    if (pid == 0 || tgid == 0)
+        return 0;
+    if (should_sample_cpu(pid, tgid)) {
+        __u8 flag = 1;
+        bpf_map_update_elem(&in_sys_mode, &pid, &flag, BPF_ANY);
+    }
+    return 0;
+}
+
+/* Tracepoint for system call exit */
+SEC("tracepoint/raw_syscalls/sys_exit")
+int trace_sys_exit(struct trace_event_raw_sys_exit *ctx)
+{
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 tgid = pid_tgid >> 32;
+    __u32 pid = (__u32)pid_tgid;
+    /* Filter out kernel threads */
+    if (pid == 0 || tgid == 0)
+        return 0;
+    if (should_sample_cpu(pid, tgid)) {
+        bpf_map_delete_elem(&in_sys_mode, &pid);
+    }
+    return 0;
 }
 
 /* Tracepoint for scheduler switch events */
@@ -148,7 +195,9 @@ int trace_sched_switch(struct trace_event_raw_sched_switch *args)
         if (req) {
             __u64 delta_ns = now - req->start_time_ns;
             if (delta_ns > 0) {
-                update_cpu_stats(prev_pid, tgid, delta_ns);
+                /* Check if the process was in sys mode */
+                __u8 *in_sys = bpf_map_lookup_elem(&in_sys_mode, &prev_pid);
+                update_cpu_stats(prev_pid, tgid, delta_ns, in_sys ? 1 : 0);
                 /* Send event to user space */
                 struct cpu_event *event =
                     bpf_ringbuf_reserve(&cpu_events, sizeof(struct cpu_event), 0);

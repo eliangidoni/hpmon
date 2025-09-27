@@ -120,6 +120,12 @@ int data_collector_init(const struct hpmon_config *config);
 int data_collector_start(void);
 
 /**
+ * Get current time in nanoseconds
+ * @returns Current time in nanoseconds
+ */
+uint64_t get_current_time_ns(void);
+
+/**
  * Stop data collection
  * @returns 0 on success, negative on error
  */
